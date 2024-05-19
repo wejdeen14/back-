@@ -90,7 +90,7 @@ public class SecurityController {
         return new ResponseEntity<>(res, res.getStatus());
     }
 
-    @PostMapping("/createAccount")git branch -M main 
+    @PostMapping("/createAccount")
     public ResponseEntity<Object> createAccount(@RequestBody ResponseModel accountData) {
         if (accountData.getPassword().length() > 20 || accountData.getPassword().length() < 6) {
             var res = new ExceptionModel();
