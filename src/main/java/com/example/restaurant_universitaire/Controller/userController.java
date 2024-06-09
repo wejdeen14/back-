@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,13 +29,6 @@ public class userController {
         return UserRepository.findAll();
     }
 
-    @PostMapping
-    public user createUser(@RequestBody user user) {
-
-        return UserRepository.save(user);
-
-    }
-
     @GetMapping("/{id}")
     public ResponseEntity<user> getUserById(@PathVariable long id) {
         user user = UserRepository.findById(id)
@@ -54,6 +46,7 @@ public class userController {
         oldUser.setGenre(userNew.getGenre());
         oldUser.setMail(userNew.getMail());
         oldUser.setTel(userNew.getTel());
+
         oldUser.setMot_de_passe(userNew.getMot_de_passe());
         oldUser.setRole(userNew.getRole());
         oldUser.setImgUser(userNew.getImgUser());

@@ -6,6 +6,6 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class LoginModel {
-    private String username;
-    private String password;
+    private String mail;
+    private String mot_de_passe;
 }

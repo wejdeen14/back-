@@ -112,6 +112,7 @@ public class factureController {
 
         return ResponseEntity.ok("Facture supprimée avec succès");
     }
+
     @PostMapping("/ajout")
     public ResponseEntity<String> AjoutFacture(@RequestBody List<factureDTO> factureDTOList) {
         try {
@@ -124,30 +125,32 @@ public class factureController {
 
                 // Enregistrez la facture dans la base de données
                 facture facture = factureRepository.save(fac);
-    
+
                 List<livcmdDTO> livraisons = factureDTO.getLiv();
                 for (livcmdDTO livraisonDTO : livraisons) {
                     List<livraisoncommande> liv = livcommandeRepository.findByIdLiv(livraisonDTO.getIdLiv());
-    
+
                     for (livraisoncommande l : liv) {
                         l.setFacture(facture);
                         livcommandeRepository.save(l);
                     }
                 }
+                // financier yahsseb tva * 20
             }
-    
+
             return ResponseEntity.ok("Factures ajoutées avec succès");
         } catch (Exception e) {
             // Gérez les erreurs en renvoyant une réponse avec le message d'erreur
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur lors de l'ajout des factures : " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erreur lors de l'ajout des factures : " + e.getMessage());
         }
     }
-    
+
     @GetMapping("/count")
     public ResponseEntity<Long> countFacture() {
-      
+
         Long count = factureRepository.count();
-Long cont= count;
+        Long cont = count;
         return ResponseEntity.ok(cont);
     }
 

@@ -8,11 +8,13 @@ import org.apache.velocity.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,7 +38,8 @@ public class sortieStockController {
     private detailsortieRepository detailsortieRepository;
     @Autowired
     private produitstockRepository produitstockRepository;
-
+  @Autowired
+    private SimpMessagingTemplate messagingTemplate;
     @GetMapping
     public List<sortieDTO> ListeSortie() {
         List<bondeSortie> sortie = bondesortieRepository.findAll();
@@ -155,6 +158,9 @@ public class sortieStockController {
                 // Récupérer le nom de la catégorie
                 String nomCategorie = produit.getCategorie().getNomCategorie();
                 detailSortieDTO.setNom_categorie(nomCategorie);
+
+                 // Vérifier si la quantité de produit est maintenant épuisée
+
             }
 
             // Mettre à jour le montant total de la bonde de sortie
@@ -240,5 +246,77 @@ public class sortieStockController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(-1.0);
         }
     }
+
+
+
+    @PutMapping("/updateSortie/{id}")
+public ResponseEntity<String> updateSortie(@PathVariable Long id, @RequestBody sortieDTO sortieDTO) {
+    try {
+        // Récupérer la bonde de sortie existante par son ID
+        bondeSortie existingBondeSortie = bondesortieRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Bonde de sortie non trouvée avec l'identifiant : " + id));
+
+        // Mettre à jour la date de sortie
+        existingBondeSortie.setDateSortie(sortieDTO.getDate_sortie());
+
+        // Récupérer les détails de sortie existants associés à la bonde de sortie
+        List<detailsortie> existingDetailsSortie = detailsortieRepository.findByBondeSortie(existingBondeSortie);
+
+        // Restaurer les quantités des produits dans le stock pour les détails de sortie existants
+        for (detailsortie detailSortie : existingDetailsSortie) {
+            ProduitStock produit = detailSortie.getProduit();
+            produit.setQte(produit.getQte() + detailSortie.getQte());
+            produitstockRepository.save(produit);
+        }
+
+        // Supprimer les détails de sortie existants
+        detailsortieRepository.deleteAll(existingDetailsSortie);
+
+        // Initialiser le montant total de la bonde de sortie
+        double montantTotalBonde = 0.0;
+
+        List<detailSortieDTO> detail = sortieDTO.getSortie();
+        if (detail == null) {
+            return ResponseEntity.badRequest().body("La liste des détails de sortie est null");
+        }
+
+        // Parcourir les nouveaux détails de la sortie et créer de nouveaux détails de sortie
+        for (detailSortieDTO detailSortieDTO : detail) {
+            ProduitStock produit = produitstockRepository.findByNomProd(detailSortieDTO.getNomProd());
+            if (produit == null) {
+                return ResponseEntity.badRequest().body("Le produit " + detailSortieDTO.getNomProd() + " n'est pas dans le stock");
+            }
+
+            // Calculer le montant total pour ce détail de sortie
+            double prixUnitaire = produit.getPrix_unitaire();
+            double montantDetail = detailSortieDTO.getQte() * prixUnitaire;
+
+            // Ajouter le montant total de ce détail au montant total de la bonde de sortie
+            montantTotalBonde += montantDetail;
+
+            // Création d'un nouveau détail de sortie
+            detailsortie nouveauDetailSortie = new detailsortie();
+            nouveauDetailSortie.setMotif(detailSortieDTO.getMotif());
+            nouveauDetailSortie.setQte(detailSortieDTO.getQte());
+            nouveauDetailSortie.setUnite(detailSortieDTO.getUnite());
+            nouveauDetailSortie.setProduit(produit);
+            nouveauDetailSortie.setBondeSortie(existingBondeSortie);
+
+            // Enregistrement du nouveau détail de sortie
+            detailsortieRepository.save(nouveauDetailSortie);
+
+            // Soustraire la quantité de sortie de la quantité totale dans la table produitstock
+            produit.setQte(produit.getQte() - detailSortieDTO.getQte());
+            produitstockRepository.save(produit);
+        }
+
+        // Mettre à jour la bonde de sortie
+        bondesortieRepository.save(existingBondeSortie);
+
+        return ResponseEntity.ok("Sortie mise à jour avec succès");
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Une erreur s'est produite lors de la mise à jour de la sortie");
+    }
+}
 
 }

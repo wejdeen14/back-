@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -147,50 +148,54 @@ public class livController {
     }
 
     @PostMapping("/AjoutLiv")
-    public String AjoutLiv(@RequestBody livDTO livDTO) {
-      
-        livraisoncommande liv = new livraisoncommande();
-        liv.setIdLiv(livDTO.getId_liv()); 
-        liv.setDate_liv(livDTO.getDate_liv());
-        liv.setPrix_totale(livDTO.getPrix_totale());
-        liv = livcommandeRepository.save(liv);
-        bondecommande bonde = bondcommandeRepository.findByIdCmd(livDTO.getIdCmd());
-     bonde.setLivraisoncommande(liv);
-     bondcommandeRepository.save(bonde);
-       
-        List<livinfo> livinfo = livDTO.getLivDetail();
+public String AjoutLiv(@RequestBody livDTO livDTO) {
 
-        // Parcours des détails de la commande
-        for (livinfo info : livinfo) {
-            ProduitStock produit = produitstockRepository.findByNomProd(info.getNomProd());
-           
-                produit = new ProduitStock();
-                Double prix = (((produit.getQte()*produit.getPrix_unitaire())+(info.getQte()*info.getPrix_unitaire()))/ (produit.getQte() + info.getQte()));
-                produit.setQte(produit.getQte() + info.getQte());
-                produit.setUnite(info.getUnite());
-                produit.setPrix_unitaire(prix);
-                
-                updateExpirationDate(produit, info.getDatexp());
-                produit = produitstockRepository.save(produit);
-            
+    livraisoncommande liv = new livraisoncommande();
+    liv.setDate_liv(livDTO.getDate_liv());
+    liv.setPrix_totale(livDTO.getPrix_totale());
+    liv = livcommandeRepository.save(liv);
 
-            // Création d'un nouveau détail de commande
-            detailslivraison nvliv = new detailslivraison();
-            nvliv.setId_detailsliv(info.getId_detailsliv());
-            nvliv.setQte(info.getQte());
-            nvliv.setUnite(info.getUnite());
-            nvliv.setProduit(produit);
-            
-            nvliv.setPrix_unitaire(info.getPrix_unitaire( ));
-            nvliv.setDatexp(info.getDatexp());
-            // Association de la bondecommande au détail de commande
-            nvliv.setLivraisoncommande(liv);
-
-            // Enregistrement du détail de commande
-            detailslivRepository.save(nvliv);
-        }
-        return "livraison ajoutée avec succès";
+    bondecommande bonde = bondcommandeRepository.findByIdCmd(livDTO.getIdCmd());
+    if (bonde != null) {
+        bonde.setLivraisoncommande(liv);
+        bondcommandeRepository.save(bonde);
     }
+
+    List<livinfo> livinfoList = livDTO.getLivDetail();
+
+    for (livinfo info : livinfoList) {
+        ProduitStock produit = produitstockRepository.findByNomProd(info.getNomProd());
+        
+        if (produit == null) {
+            produit = new ProduitStock();
+            produit.setNomProd(info.getNomProd());
+            produit.setQte(info.getQte());
+            produit.setUnite(info.getUnite());
+            produit.setPrix_unitaire(info.getPrix_unitaire());
+        } else {
+            Double prix = (((produit.getQte() * produit.getPrix_unitaire()) + (info.getQte() * info.getPrix_unitaire())) / (produit.getQte() + info.getQte()));
+            produit.setQte(produit.getQte() + info.getQte());
+            produit.setUnite(info.getUnite());
+            produit.setPrix_unitaire(prix);
+        }
+
+        updateExpirationDate(produit, info.getDatexp());
+        produit = produitstockRepository.save(produit);
+
+        detailslivraison nvliv = new detailslivraison();
+        nvliv.setQte(info.getQte());
+        nvliv.setUnite(info.getUnite());
+        nvliv.setProduit(produit);
+        nvliv.setPrix_unitaire(info.getPrix_unitaire());
+        nvliv.setDatexp(info.getDatexp());
+        nvliv.setLivraisoncommande(liv);
+
+        detailslivRepository.save(nvliv);
+    }
+
+    return "livraison ajoutée avec succès";
+}
+
 
     private void updateExpirationDate(ProduitStock produit, Date nouvelleDateExpiration) {
         if (nouvelleDateExpiration == null) {
@@ -300,4 +305,8 @@ public class livController {
     }
     
 
+
+
+
+    
 }

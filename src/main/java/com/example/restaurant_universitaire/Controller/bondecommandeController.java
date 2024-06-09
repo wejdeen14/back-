@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import org.apache.velocity.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -19,10 +20,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.restaurant_universitaire.DTO.bondeDTO;
+import com.example.restaurant_universitaire.DTO.cmdNull;
 import com.example.restaurant_universitaire.DTO.detailInfo;
 import com.example.restaurant_universitaire.Model.ProduitStock;
 import com.example.restaurant_universitaire.Model.bondecommande;
 import com.example.restaurant_universitaire.Model.detailcomd;
+import com.example.restaurant_universitaire.Model.fournisseur;
 import com.example.restaurant_universitaire.Repository.bondcommandeRepository;
 import com.example.restaurant_universitaire.Repository.detailcomdRepository;
 import com.example.restaurant_universitaire.Repository.produitstockRepository;
@@ -52,7 +55,7 @@ public class bondecommandeController {
         bondeDTO bondeDTO = new bondeDTO();
         bondeDTO.setId_cmd(bondecommande.getIdCmd());
         bondeDTO.setDate_cmd(bondecommande.getDate_cmd());
-// Vérifier si la bondeliv associée à la bonde n'est pas nulle avant
+        // Vérifier si la bondeliv associée à la bonde n'est pas nulle avant
         // d'accéder à son ID
         if (bondecommande.getLivraisoncommande() != null && bondecommande.getLivraisoncommande().getIdLiv() != null) {
             bondeDTO.setId_liv(bondecommande.getLivraisoncommande().getIdLiv());
@@ -159,11 +162,11 @@ public class bondecommandeController {
             ProduitStock produit = produitstockRepository.findByNomProd(info.getNomProd());
             // Création d'un nouveau détail de commande
             detailcomd detailcomd = new detailcomd();
-            detailcomd.setId_detail(info.getId_detail()); 
-            detailcomd.setQte(info.getQuantite()); 
-            detailcomd.setUnite(info.getUnite()); 
-           detailcomd.setProduit(produit);
-          
+            detailcomd.setId_detail(info.getId_detail());
+            detailcomd.setQte(info.getQuantite());
+            detailcomd.setUnite(info.getUnite());
+            detailcomd.setProduit(produit);
+
             detailcomd.setBondecommande(bonde);
 
             // Enregistrement du détail de commande
@@ -172,23 +175,52 @@ public class bondecommandeController {
         return "Commande ajoutée avec succès";
     }
 
-
-
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> deleteBondecommande(@PathVariable Long id) {
         bondecommande bonde = BondcommandeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Bonde de commande non trouvée avec l'identifiant : " + id));
-    
+
         // Supprimer les détails de commande associés à cette commande
         List<detailcomd> details = detailcomdRepository.findByBondecommande(bonde);
         detailcomdRepository.deleteAll(details);
-    
+
         // Supprimer la commande elle-même
         BondcommandeRepository.delete(bonde);
-    
+
         return ResponseEntity.ok().build();
     }
-    
+
+
+    @GetMapping("/bondecommande-idLiv-null")
+    public ResponseEntity<List<cmdNull>> getBondecommandeIdLivNull() {
+        try {
+            List<bondecommande> bondecommandesWithoutLivraison = BondcommandeRepository.findByLivraisoncommandeIsNull();
+            List<cmdNull> bondeDTOs = bondecommandesWithoutLivraison.stream()
+                    .map(this::mapToBondeDTOWithSupplier)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(bondeDTOs);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private cmdNull mapToBondeDTOWithSupplier(bondecommande bonde) {
+        cmdNull cmdNull = new cmdNull();
+        cmdNull.setId_cmd(bonde.getIdCmd());
+        cmdNull.setDate_cmd(bonde.getDate_cmd());
+
+        List<detailcomd> details = detailcomdRepository.findByBondecommande(bonde);
+        if (!details.isEmpty()) {
+            ProduitStock produit = details.get(0).getProduit();
+            if (produit != null && produit.getCategorie() != null && produit.getCategorie().getFournisseur() != null) {
+                fournisseur fournisseur = produit.getCategorie().getFournisseur();
+                cmdNull.setId_for(fournisseur.getId_for());
+                cmdNull.setNomFor(fournisseur.getNom_for());
+                
+            }
+        }
+        return cmdNull;
+    }
 
 }
